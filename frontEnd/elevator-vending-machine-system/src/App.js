@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { OrderProvider } from './context/OrderContext';
 import useIdleTimer from './hooks/useIdleTimer';
+import useAdminKey from './hooks/useAdminKey';
 
 // 페이지 임포트
 import IntroPage from './pages/IntroPage';
@@ -10,9 +11,14 @@ import ProductDetailPage from './pages/ProductDetailPage';
 import PaymentPage from './pages/PaymentPage';
 import ResultPage from './pages/ResultPage';
 
+
+import AdminProductListPage from "./pages/AdminProductListPage";
+
+
 // 타임아웃 감지를 위해 내부 컴포넌트 분리
 const AppContent = () => {
-  useIdleTimer(30000); // 30초 타임아웃 적용
+  useIdleTimer(300000); // 300초 타임아웃 적용
+    useAdminKey();
 
   return (
       <Routes>
@@ -21,6 +27,7 @@ const AppContent = () => {
         <Route path="/detail/:id" element={<ProductDetailPage />} />
         <Route path="/payment" element={<PaymentPage />} />
         <Route path="/result" element={<ResultPage />} />
+          <Route path="/adminList" element={<AdminProductListPage/>}/>
       </Routes>
   );
 };
