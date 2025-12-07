@@ -12,7 +12,10 @@ import PaymentPage from './pages/PaymentPage';
 import ResultPage from './pages/ResultPage';
 
 
+
 import AdminProductListPage from "./pages/AdminProductListPage";
+import AdminProductFormPage from "./pages/AdminProductFormPage";
+
 
 
 // 타임아웃 감지를 위해 내부 컴포넌트 분리
@@ -28,6 +31,8 @@ const AppContent = () => {
         <Route path="/payment" element={<PaymentPage />} />
         <Route path="/result" element={<ResultPage />} />
           <Route path="/adminList" element={<AdminProductListPage/>}/>
+          <Route path="/adminForm" element={<AdminProductFormPage/>}/>
+
       </Routes>
   );
 };

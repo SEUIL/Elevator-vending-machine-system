@@ -36,19 +36,19 @@ const AdminProductListPage = () => {
     return (
         <div style={{ padding: '20px', backgroundColor: '#f4f4f4', minHeight: '100vh' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                <h2>🛠️ 재고 및 상품 관리</h2>
+                <h2>상품 관리</h2>
                 <div>
                     <button
-                        onClick={() => navigate('/create')}
+                        onClick={() => navigate('/adminForm')}
                         style={{ padding: '10px 20px', backgroundColor: '#2ecc71', color: 'white', border: 'none', borderRadius: '5px', marginRight: '10px', cursor: 'pointer' }}
                     >
                         + 신규 상품 등록
                     </button>
                     <button
-                        onClick={() => navigate('/admin/menu')}
+                        onClick={() => navigate('/')}
                         style={{ padding: '10px 20px', backgroundColor: '#95a5a6', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}
                     >
-                        메뉴로 돌아가기
+                        사용자 모드로 돌아가기
                     </button>
                 </div>
             </div>
