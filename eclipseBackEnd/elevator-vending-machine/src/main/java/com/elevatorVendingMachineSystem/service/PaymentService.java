@@ -24,7 +24,9 @@ public class PaymentService {
     private final PaymentLogRepository paymentLogRepository;
     //찬범추
     private final EmbeddedClientService embeddedClientService;
-
+    // 현금 결제 누적 세션
+    private Long currentCashProductId = null;
+    private int currentInsertedCashAmount = 0;
 
     /**
      * 결제 프로세스 통합 처리 (SID-014 ~ SID-018)
@@ -45,14 +47,67 @@ public class PaymentService {
         int change = 0; // 거스름돈
 
         if (request.getMethod() == PaymentMethod.CASH) {
-            // 현금 결제: 금액 비교 (SID-007)
-            if (request.getInsertedAmount() < product.getPrice()) {
-                savePaymentLog(product, request, PaymentStatus.FAIL, "투입 금액 부족");
-                return new PaymentDto.Response(false, "투입 금액이 부족합니다.", request.getInsertedAmount());
+
+            // ================================
+            // 🔽 ① 첫 투입이거나 상품이 바뀐 경우 초기화
+            // ================================
+            if (currentCashProductId == null || !currentCashProductId.equals(product.getId())) {
+                currentCashProductId = product.getId();
+                currentInsertedCashAmount = 0;
             }
-            // 잔액 계산 (SID-008)
-            change = request.getInsertedAmount() - product.getPrice();
-        } else if (request.getMethod() == PaymentMethod.CARD) {
+
+            // ================================
+            // 🔽 ② 금액 누적
+            // ================================
+            currentInsertedCashAmount += request.getInsertedAmount();
+
+            // ================================
+            // 🔽 ③ 금액 부족 → 추가 투입 요청
+            // ================================
+            if (currentInsertedCashAmount < product.getPrice()) {
+                return new PaymentDto.Response(
+                        false,
+                        "추가 투입이 필요합니다.",
+                        currentInsertedCashAmount
+                );
+            }
+
+            change = currentInsertedCashAmount - product.getPrice();
+
+            // 재고 차감
+            product.decreaseStock(1);
+
+            // 결제 로그 저장
+            savePaymentLog(product, request, PaymentStatus.SUCCESS, null);
+
+            // 영수증 출력 여부 체크
+            if (request.isNeedReceipt()) {
+                printReceipt(product, product.getPrice(), change);
+            }
+
+            // ================================
+            // 🔽 상품 출고 로그 + 하드웨어 신호 추가
+            // ================================
+            log.info("==================================================");
+            log.info("📢 [하드웨어 신호 전송] 상품명: {}, 위치: {} -> 상품이 출고되었습니다.",
+                    product.getName(), product.getLocationCode());
+            log.info("==================================================");
+
+            // 실제 하드웨어 명령 전송 가능 시
+            // embeddedClientService.sendDispenseCommand(product);
+
+            // 세션 초기화
+            currentCashProductId = null;
+            currentInsertedCashAmount = 0;
+
+            // 최종 결제 완료 응답 반환
+            return new PaymentDto.Response(
+                    true,
+                    "결제가 완료되었습니다. 상품을 꺼내주세요.",
+                    change
+            );
+        }
+        else if (request.getMethod() == PaymentMethod.CARD) {
             // 카드 결제: PG사 승인 요청 (SID-015 Mocking)
             // 실제로는 외부 API를 호출하지만, 여기서는 성공으로 가정
             log.info("PG사 승인 요청... [카드 번호: ****-****-****-2025, 금액: {}]", product.getPrice());
@@ -70,8 +125,8 @@ public class PaymentService {
                 product.getName(), product.getLocationCode());
         log.info("==================================================");
 
-        // 찬범추가 - 노트북2에 출고신호 전송 - 테스트할때는 꺼도 될듯
-        embeddedClientService.sendDispenseCommand(product);
+        // 찬범추 - 노트북2에 출고신호 전송
+        //embeddedClientService.sendDispenseCommand(product);
 
         // 5. 재고 차감 (트랜잭션 내 수행)
         product.decreaseStock(1);
@@ -86,6 +141,46 @@ public class PaymentService {
 
         return new PaymentDto.Response(true, "결제가 완료되었습니다. 상품을 꺼내주세요.", change);
     }
+
+    // ================================
+// 🔽 추가: 현금 최종 결제 확정 메서드
+// ================================
+    @Transactional
+    public PaymentDto.Response confirmPayment(boolean needReceipt) {
+
+        if (currentCashProductId == null) {
+            return new PaymentDto.Response(false, "결제 중인 현금 거래가 없습니다.", 0);
+        }
+
+        Product product = productRepository.findById(currentCashProductId)
+                .orElseThrow(() -> new IllegalArgumentException("상품 오류"));
+
+        int price = product.getPrice();
+
+        if (currentInsertedCashAmount < price) {
+            return new PaymentDto.Response(false, "투입 금액이 부족합니다.", currentInsertedCashAmount);
+        }
+
+        int change = currentInsertedCashAmount - price;
+
+        // 재고 차감
+        product.decreaseStock(1);
+
+        // 로그 저장
+        savePaymentLog(product, new PaymentDto.Request(), PaymentStatus.SUCCESS, null);
+
+        // 영수증 출력
+        if (needReceipt) {
+            printReceipt(product, price, change);
+        }
+
+        // 세션 초기화
+        currentCashProductId = null;
+        currentInsertedCashAmount = 0;
+
+        return new PaymentDto.Response(true, "결제가 완료되었습니다.", change);
+    }
+
 
     /**
      * 영수증 출력 메서드 (UT-303 구현)
@@ -124,4 +219,23 @@ public class PaymentService {
 
         paymentLogRepository.save(log);
     }
+    // 현금 결제 전용 오버로딩
+    private void printReceipt(Product product, int price, int change) {
+        String dateTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+
+        System.out.println("\n");
+        System.out.println("********** [영수증] **********");
+        System.out.println("상호명: BCU 컴퍼니 엘리베이터 자판기 1호");
+        System.out.println("일  시: " + dateTime);
+        System.out.println("------------------------------");
+        System.out.println("상품명          단가    수량    금액");
+        System.out.printf("%-10s %,6d    1   %,6d\n", product.getName(), price, price);
+        System.out.println("------------------------------");
+        System.out.printf("합계 금액:              %,7d원\n", price);
+        System.out.printf("받은 금액(CASH):       %,7d원\n", price + change);
+        System.out.printf("거스름돈:               %,7d원\n", change);
+        System.out.println("******************************");
+        System.out.println("\n");
+    }
+
 }

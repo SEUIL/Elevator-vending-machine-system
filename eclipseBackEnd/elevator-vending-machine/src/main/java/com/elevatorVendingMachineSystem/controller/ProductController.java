@@ -1,5 +1,6 @@
 package com.elevatorVendingMachineSystem.controller;
 
+import com.elevatorVendingMachineSystem.dto.PaymentDto;
 import com.elevatorVendingMachineSystem.dto.ProductDto;
 import com.elevatorVendingMachineSystem.service.FileService;
 import com.elevatorVendingMachineSystem.service.ProductService;
@@ -15,7 +16,7 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/products")
-@CrossOrigin(origins = "http://localhost:3000") // React 개발 서버 허용
+@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:3001"}) // React 개발 서버 허용
 public class ProductController {
 
     private final ProductService productService;
@@ -56,10 +57,16 @@ public class ProductController {
             @RequestPart(value = "file", required = false) MultipartFile file
     ) throws IOException {
 
-        String imageUrl = fileService.saveFile(file);
-        // 이미지가 없으면 null이 반환됨 -> 서비스에서 기존 이미지 유지 로직 필요
+        String imageUrl = null;
+
+        // ✅ file 이 null 이거나 비어있으면 저장하지 않음
+        if (file != null && !file.isEmpty()) {
+            imageUrl = fileService.saveFile(file);
+        }
+
         return ResponseEntity.ok(productService.updateProduct(id, requestDto, imageUrl));
     }
+
 
     // 상품 삭제 (관리자)
     @DeleteMapping("/{id}")
@@ -67,4 +74,7 @@ public class ProductController {
         productService.deleteProduct(id);
         return ResponseEntity.ok(id);
     }
+
+
+
 }

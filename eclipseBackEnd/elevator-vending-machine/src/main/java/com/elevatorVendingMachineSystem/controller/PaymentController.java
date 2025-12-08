@@ -20,10 +20,17 @@ public class PaymentController {
         PaymentDto.Response response = paymentService.processPayment(request);
 
         if (!response.isSuccess()) {
-         
+
             return ResponseEntity.ok(response);
         }
 
+        return ResponseEntity.ok(response);
+    }
+    @PostMapping("/confirm")
+    public ResponseEntity<PaymentDto.Response> confirmPayment(
+            @RequestParam boolean needReceipt) {
+
+        PaymentDto.Response response = paymentService.confirmPayment(needReceipt);
         return ResponseEntity.ok(response);
     }
 }

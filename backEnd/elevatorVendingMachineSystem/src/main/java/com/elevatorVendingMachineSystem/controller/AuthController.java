@@ -1,12 +1,14 @@
 package com.elevatorVendingMachineSystem.controller;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin; //디용 리액트 연결용
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
+@CrossOrigin(origins = "http://localhost:3000") //디용 리액트 연결용
 public class AuthController {
 
     // 로그인 테스트용 API
